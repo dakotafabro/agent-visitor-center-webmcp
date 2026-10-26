@@ -12,13 +12,22 @@ if (!startUrl || !userscriptPath) {
   process.exit(2);
 }
 const callLog = process.env.AVC_CALL_LOG;
-const chrome = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const defaultChrome = {
+  darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  linux: "/usr/bin/google-chrome",
+  win32: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+}[process.platform];
+const chrome = process.env.CHROME_PATH ?? defaultChrome;
+if (!chrome) {
+  console.error("Set CHROME_PATH to a Chrome executable.");
+  process.exit(2);
+}
 const profile = join(tmpdir(), `avc-bridge-${process.pid}-${Date.now()}`);
 
 const userscript = await readFile(userscriptPath, "utf8");
 const browser = await puppeteer.launch({
   executablePath: chrome,
-  headless: "new",
+  headless: process.env.AVC_SHOW_BROWSER === "1" ? false : "new",
   userDataDir: profile,
   args: ["--enable-features=WebMCPTesting"],
 });
