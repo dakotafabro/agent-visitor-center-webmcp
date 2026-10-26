@@ -2,6 +2,8 @@ import { fillSelector, fillText, fillUrl, ToolInputError } from "./template.js";
 import type {
   EndpointSource,
   FieldSpec,
+  PickSpec,
+  ValueSpec,
   Handler,
   SelectorSource,
   Source,
@@ -55,21 +57,54 @@ export function pathValue(value: unknown, path: string): unknown {
   return walk(value, path.split("."));
 }
 
+function fragment(document: Document, html: string): DocumentFragment {
+  const container = document.createElement("template");
+  container.innerHTML = html;
+  return container.content;
+}
+
 function toText(document: Document, value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => toText(document, item));
   if (typeof value !== "string") return value;
-  const container = document.createElement("template");
-  container.innerHTML = value.replace(/<(?:br|\/p|\/h[1-6]|\/li|\/div)\b[^>]*>/gi, "$& ");
-  return (container.content.textContent ?? "").replace(/\s+/g, " ").trim();
+  return textOf(fragment(document, value));
+}
+
+/** Applies `match` (first capture group, or the whole match) and then `type` to a value or each item of a list. */
+export function shapeValue(value: unknown, spec: ValueSpec): unknown {
+  if (Array.isArray(value)) return value.map((item) => shapeValue(item, spec));
+  let result = value;
+  if (spec.match !== undefined && result !== null && result !== undefined) {
+    const found = new RegExp(spec.match).exec(String(result));
+    result = found ? (found[1] ?? found[0]) : null;
+  }
+  if (spec.type === "number" && result !== null && result !== undefined) {
+    const number = Number(result);
+    result = Number.isFinite(number) ? number : null;
+  }
+  if (spec.type === "string" && result !== null && result !== undefined) result = String(result);
+  return result;
+}
+
+function readHtml(document: Document, value: unknown, fields: Record<string, FieldSpec>): unknown {
+  if (Array.isArray(value)) return value.map((item) => readHtml(document, item, fields));
+  if (typeof value !== "string") return null;
+  const root = fragment(document, value);
+  const result: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(fields)) result[key] = readField(root, field);
+  return result;
+}
+
+function pickOne(document: Document, item: unknown, spec: string | PickSpec, text: boolean): unknown {
+  const options: PickSpec = typeof spec === "string" ? { path: spec } : spec;
+  const raw = pathValue(item, options.path);
+  if (options.html) return readHtml(document, raw, options.html);
+  return shapeValue(text ? toText(document, raw) : raw, options);
 }
 
 function pick(document: Document, item: unknown, source: EndpointSource): unknown {
   if (!source.pick) return item;
   const picked: Record<string, unknown> = {};
-  for (const [key, path] of Object.entries(source.pick)) {
-    const value = pathValue(item, path);
-    picked[key] = source.text ? toText(document, value) : value;
-  }
+  for (const [key, spec] of Object.entries(source.pick)) picked[key] = pickOne(document, item, spec, source.text === true);
   return picked;
 }
 
@@ -101,27 +136,47 @@ async function runEndpoint(source: EndpointSource, input: ToolInput, context: Ru
   return Array.isArray(body) ? body.map((item) => pick(context.document, item, source)) : pick(context.document, body, source);
 }
 
-function textOf(element: Element): string {
-  const parts: string[] = [];
-  const walker = element.ownerDocument.createTreeWalker(element, 4);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const parent = node.parentElement;
-    if (parent && (parent.closest("style, script, template") || parent.closest("svg"))) continue;
-    const text = (node.textContent ?? "").replace(/\s+/g, " ").trim();
-    if (text) parts.push(text);
+const SKIPPED = new Set(["STYLE", "SCRIPT", "TEMPLATE", "SVG", "svg", "NOSCRIPT"]);
+const BLOCK = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|BR|DD|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|TABLE|TD|TH|TR|UL)$/;
+
+function collectText(node: Node, parts: string[]): void {
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.nodeType === 3) {
+      parts.push(child.nodeValue ?? "");
+    } else if (child.nodeType === 1) {
+      const tag = (child as Element).tagName;
+      if (SKIPPED.has(tag)) continue;
+      const block = BLOCK.test(tag.toUpperCase());
+      if (block) parts.push(" ");
+      collectText(child, parts);
+      if (block) parts.push(" ");
+    }
   }
-  return parts.join(" ");
 }
 
-function readField(element: Element, field: FieldSpec): unknown {
-  if (!field.selector) return readValue(element, field);
-  if (field.all) return [...element.querySelectorAll(field.selector)].map((target) => readValue(target, field));
-  const target = element.querySelector(field.selector);
+/** Text as a reader sees it: inline elements run together, block elements are separated by a space. */
+function textOf(root: Node): string {
+  const parts: string[] = [];
+  collectText(root, parts);
+  return parts.join("").replace(/\s+/g, " ").trim();
+}
+
+type Root = Element | DocumentFragment;
+
+function readField(root: Root, field: FieldSpec): unknown {
+  if (!field.selector) return "getAttribute" in root ? readValue(root, field) : null;
+  if (field.all) return [...root.querySelectorAll(field.selector)].map((target) => readValue(target, field));
+  const target = root.querySelector(field.selector);
   return target ? readValue(target, field) : null;
 }
 
 function readValue(target: Element, field: FieldSpec): unknown {
-  return field.attribute ? target.getAttribute(field.attribute) : textOf(target);
+  if (field.fields) {
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(field.fields)) result[key] = readField(target, child);
+    return result;
+  }
+  return shapeValue(field.attribute ? target.getAttribute(field.attribute) : textOf(target), field);
 }
 
 function readElement(element: Element, source: SelectorSource): unknown {

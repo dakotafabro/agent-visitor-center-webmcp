@@ -128,9 +128,9 @@ describe("registerSite", () => {
     expect(all).toEqual([{ title: "No Poverty" }, { title: "Zero Hunger" }]);
   });
 
-  it("joins text from separate elements with spaces and skips styles and icons", async () => {
+  it("separates block elements with spaces, keeps inline links in the sentence, and skips styles and icons", async () => {
     // given
-    document.body.innerHTML = `<div id="hero"><span>13</span><style>.x{}</style><svg><text>icon</text></svg><p>Take urgent action.</p><a>Find out more</a></div>`;
+    document.body.innerHTML = `<div id="hero"><span>13</span><style>.x{}</style><svg><text>icon</text></svg><p>Take urgent action from <a href="#">Climate Neutral Now</a>.</p><div><a>Find out more</a></div></div>`;
     const context = new FakeModelContext();
     const heroSchema = {
       version: 1,
@@ -143,7 +143,55 @@ describe("registerSite", () => {
     const result = await context.call("hero");
 
     // then
-    expect(result).toBe("13 Take urgent action. Find out more");
+    expect(result).toBe("13 Take urgent action from Climate Neutral Now. Find out more");
+  });
+
+  it("gives the same shape from an endpoint's HTML and from the page", async () => {
+    // given
+    document.body.innerHTML = `<div id="targets"><div class="t"><h3>ERADICATE</h3><p>By 2030</p></div><div class="t"><h3>PROTECT</h3><p>Build resilience</p></div></div><span id="n">1</span>`;
+    const item = { title: { selector: "h3" }, text: { selector: "p" } };
+    const shapeSchema = {
+      version: 1,
+      site: { name: "x" },
+      allowedOrigins: ["https://cms.example.org"],
+      tools: [
+        {
+          name: "api",
+          description: "From the API.",
+          source: {
+            type: "endpoint",
+            url: "https://cms.example.org/t",
+            pick: { number: { path: "id", type: "number" }, targets: { path: "list[].copy", html: item } },
+          },
+        },
+        {
+          name: "page",
+          description: "From the page.",
+          source: {
+            type: "selector",
+            selector: "body",
+            fields: { number: { selector: "#n", type: "number" }, targets: { selector: "#targets .t", all: true, fields: item } },
+          },
+        },
+      ],
+    };
+    const body = { id: "1", list: [{ copy: "<h3>ERADICATE</h3><p>By 2030</p>" }, { copy: "<h3>PROTECT</h3><p>Build resilience</p>" }] };
+    const context = new FakeModelContext();
+    await registerSite(shapeSchema, { modelContext: context, fetch: jsonFetch(body) });
+
+    // when
+    const fromApi = await context.call("api");
+    const fromPage = await context.call("page");
+
+    // then
+    expect(fromApi).toEqual({
+      number: 1,
+      targets: [
+        { title: "ERADICATE", text: "By 2030" },
+        { title: "PROTECT", text: "Build resilience" },
+      ],
+    });
+    expect(fromPage).toEqual(fromApi);
   });
 
   it("reads an attribute from the matched element itself", async () => {

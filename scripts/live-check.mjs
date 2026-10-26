@@ -12,6 +12,36 @@ function check(label, ok, detail) {
   if (!ok) failures.push(label);
 }
 
+function shapeOf(value) {
+  if (Array.isArray(value)) return value.length === 0 ? [] : [shapeOf(value[0])];
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, shapeOf(value[key])]));
+  return typeof value;
+}
+
+function firstDifference(a, b, path = "") {
+  if (JSON.stringify(a) === JSON.stringify(b)) return null;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return `${path || "list"} has ${a.length} items from the API and ${b.length} from the page`;
+    for (let index = 0; index < a.length; index++) {
+      const found = firstDifference(a[index], b[index], `${path}[${index}]`);
+      if (found) return found;
+    }
+  }
+  if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a)) {
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const found = firstDifference(a[key], b[key], path ? `${path}.${key}` : key);
+      if (found) return found;
+    }
+  }
+  return `${path}: API ${JSON.stringify(a).slice(0, 70)} vs page ${JSON.stringify(b).slice(0, 70)}`;
+}
+
+function sameShape(label, fromApi, fromPage) {
+  check(`${label} has the same shape from the API and the page`, JSON.stringify(shapeOf(fromApi)) === JSON.stringify(shapeOf(fromPage)), shapeOf(fromPage));
+  const difference = firstDifference(fromApi, fromPage);
+  console.log(`      values ${difference ? `differ: ${difference}` : "match exactly"}`);
+}
+
 async function withPage(browser, url, { blockCms = false } = {}, run) {
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
@@ -55,11 +85,11 @@ for (const native of [true, false]) {
       const tools = await page.evaluate(async () => (await document.modelContext.getTools()).map((tool) => tool.name).sort());
       check(`${mode}: six tools registered`, tools.length === 6, tools);
       const goals = await call("list_goals");
-      check(`${mode}: list_goals returns 17 goals`, goals.length === 17, goals[12]);
+      check(`${mode}: list_goals returns 17 goals with numeric numbers`, goals.length === 17 && goals[12].number === 13, goals[12]);
       const goal = await call("get_goal", { number: 13 });
       check(`${mode}: get_goal 13 is Climate action`, goal.title === "Climate action", goal.summary);
       const targets = await call("get_targets", { number: 13 });
-      check(`${mode}: get_targets 13 has targets`, targets.targets?.length > 0, targets.targets?.length);
+      check(`${mode}: get_targets 13 has targets`, targets.targets?.length > 0, targets.targets?.[0]);
       const actions = await call("get_actions", { number: 13 });
       check(`${mode}: get_actions 13 has actions`, actions.actions?.length > 0, actions.actions?.length);
       const scrolled = await call("scroll_to_section", { section: "targets" });
@@ -73,13 +103,22 @@ for (const native of [true, false]) {
       await page.waitForNavigation({ timeout: 20000 }).catch(() => {});
       check(`${mode}: open_goal navigates`, page.url() === "https://globalgoals.org/goals/14-life-below-water/", page.url());
     });
+    const fromApi = {};
+    await withPage(browser, "https://globalgoals.org/goals/", {}, async (_page, call) => {
+      fromApi.list_goals = await call("list_goals");
+    });
+    await withPage(browser, "https://globalgoals.org/goals/13-climate-action/", {}, async (_page, call) => {
+      for (const name of ["get_goal", "get_targets", "get_actions"]) fromApi[name] = await call(name, { number: 13 });
+    });
     await withPage(browser, "https://globalgoals.org/goals/", { blockCms: true }, async (_page, call) => {
       const goals = await call("list_goals");
       check(`${mode}: list_goals falls back to the page`, goals.length === 17, goals[0]);
+      sameShape(`${mode}: list_goals`, fromApi.list_goals, goals);
     });
     await withPage(browser, "https://globalgoals.org/goals/13-climate-action/", { blockCms: true }, async (_page, call) => {
-      const targets = await call("get_targets", { number: 13 });
-      check(`${mode}: get_targets falls back to the page`, targets.length > 0, targets[0]);
+      for (const name of ["get_goal", "get_targets", "get_actions"]) {
+        sameShape(`${mode}: ${name}`, fromApi[name], await call(name, { number: 13 }));
+      }
       const other = await call("get_targets", { number: 14 });
       check(`${mode}: fallback won't read another goal's page`, typeof other.error === "string", other);
     });

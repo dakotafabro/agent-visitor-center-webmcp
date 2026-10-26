@@ -34,8 +34,8 @@ registration.unregister();
 
 Each tool has a `name`, a `description`, an optional JSON Schema `inputSchema`, optional WebMCP `annotations`, a `source`, and an optional `fallback` source that runs when the first one fails. `{name}` in a source fills in that input.
 
-- **`endpoint`**: fetches JSON from `url`. `pick` maps output names to field paths (`"title.rendered"`; `list[]` maps over a list and `list[field=value]` picks one item), `find` returns the one array item whose `field` equals a value, and `text: true` turns picked HTML into plain text. Requests go to the page's own origin or to one listed in `allowedOrigins`, without cookies.
-- **`selector`**: reads text from the page. `fields` reads named parts of the match (a field with only an `attribute` reads it from the match itself), and `all: true` returns every match. Selector inputs may only use letters, numbers, `-` and `_`.
+- **`endpoint`**: fetches JSON from `url`. `pick` maps output names to field paths (`"title.rendered"`; `list[]` maps over a list and `list[field=value]` picks one item), or to `{path, match, type, html}` to take a regular-expression capture, convert to a number, or read fields out of an HTML string the same way a `selector` source reads the page, `find` returns the one array item whose `field` equals a value, and `text: true` turns picked HTML into plain text. Requests go to the page's own origin or to one listed in `allowedOrigins`, without cookies.
+- **`selector`**: reads text from the page. `fields` reads named parts of the match (a field with only an `attribute` reads it from the match itself, and fields can nest), `all: true` returns every match, and `match` and `type` work as in `pick`. Text reads the way a person sees it: block elements are separated by a space, and inline links stay in the sentence. Selector inputs may only use letters, numbers, `-` and `_`.
 - **`navigate`**: opens a page on the same site.
 - **`scroll`**: scrolls the page to an element.
 - **`handler`**: calls a function you pass in `registerSite(schema, { handlers })`.

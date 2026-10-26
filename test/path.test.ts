@@ -29,3 +29,13 @@ describe("pathValue", () => {
     expect(pathValue(goal, "acf.id[]")).toBeUndefined();
   });
 });
+
+describe("shapeValue", () => {
+  it("takes the first capture group and converts to a number", async () => {
+    const { shapeValue } = await import("../src/sources.js");
+    expect(shapeValue("/goals/13-climate-action/", { match: "^/goals/([^/]+)/" })).toBe("13-climate-action");
+    expect(shapeValue("13", { type: "number" })).toBe(13);
+    expect(shapeValue(["1", "x"], { type: "number" })).toEqual([1, null]);
+    expect(shapeValue("no match", { match: "^\\d+$" })).toBeNull();
+  });
+});

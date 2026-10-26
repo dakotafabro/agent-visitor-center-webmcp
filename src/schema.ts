@@ -30,6 +30,61 @@ function templatesOf(source: Record<string, unknown>): string[] {
   return templates;
 }
 
+function checkValueSpec(spec: Record<string, unknown>, where: string, errors: string[]): void {
+  if (spec["match"] !== undefined) {
+    if (typeof spec["match"] !== "string") {
+      errors.push(`${where}.match must be a regular expression string.`);
+    } else {
+      try {
+        new RegExp(spec["match"]);
+      } catch {
+        errors.push(`${where}.match isn't a valid regular expression.`);
+      }
+    }
+  }
+  if (spec["type"] !== undefined && spec["type"] !== "string" && spec["type"] !== "number") {
+    errors.push(`${where}.type must be "string" or "number".`);
+  }
+}
+
+function checkFields(fields: unknown, where: string, errors: string[]): void {
+  if (!isObject(fields)) {
+    errors.push(`${where} must be an object.`);
+    return;
+  }
+  for (const [key, field] of Object.entries(fields)) {
+    const at = `${where}.${key}`;
+    if (!isObject(field)) {
+      errors.push(`${at} must be an object.`);
+      continue;
+    }
+    if (field["selector"] !== undefined && !isNonEmptyString(field["selector"])) {
+      errors.push(`${at}.selector must be a non-empty string when given.`);
+    } else if (field["selector"] === undefined && field["attribute"] === undefined && field["fields"] === undefined) {
+      errors.push(`${at} needs a selector, an attribute, or both.`);
+    }
+    checkValueSpec(field, at, errors);
+    if (field["fields"] !== undefined) checkFields(field["fields"], `${at}.fields`, errors);
+  }
+}
+
+function checkPick(pick: unknown, where: string, errors: string[]): void {
+  if (!isObject(pick)) {
+    errors.push(`${where} must be an object of output names to field paths.`);
+    return;
+  }
+  for (const [key, spec] of Object.entries(pick)) {
+    const at = `${where}.${key}`;
+    if (typeof spec === "string") continue;
+    if (!isObject(spec) || !isNonEmptyString(spec["path"])) {
+      errors.push(`${at} must be a field path or an object with a "path".`);
+      continue;
+    }
+    checkValueSpec(spec, at, errors);
+    if (spec["html"] !== undefined) checkFields(spec["html"], `${at}.html`, errors);
+  }
+}
+
 function checkSource(source: unknown, where: string, inputs: Set<string> | undefined, errors: string[]): void {
   if (!isObject(source)) {
     errors.push(`${where} must be an object.`);
@@ -44,25 +99,8 @@ function checkSource(source: unknown, where: string, inputs: Set<string> | undef
   if (!isNonEmptyString(source[required])) {
     errors.push(`${where}.${required} is required for a ${type} source.`);
   }
-  if (type === "selector" && source["fields"] !== undefined) {
-    const fields = source["fields"];
-    if (!isObject(fields)) {
-      errors.push(`${where}.fields must be an object.`);
-    } else {
-      for (const [key, field] of Object.entries(fields)) {
-        if (!isObject(field)) {
-          errors.push(`${where}.fields.${key} must be an object.`);
-        } else if (field["selector"] !== undefined && !isNonEmptyString(field["selector"])) {
-          errors.push(`${where}.fields.${key}.selector must be a non-empty string when given.`);
-        } else if (field["selector"] === undefined && field["attribute"] === undefined) {
-          errors.push(`${where}.fields.${key} needs a selector, an attribute, or both.`);
-        }
-      }
-    }
-  }
-  if (type === "endpoint" && source["pick"] !== undefined && !isObject(source["pick"])) {
-    errors.push(`${where}.pick must be an object of output names to field paths.`);
-  }
+  if (type === "selector" && source["fields"] !== undefined) checkFields(source["fields"], `${where}.fields`, errors);
+  if (type === "endpoint" && source["pick"] !== undefined) checkPick(source["pick"], `${where}.pick`, errors);
   if (type === "endpoint" && source["find"] !== undefined) {
     const find = source["find"];
     if (!isObject(find) || !isNonEmptyString(find["field"]) || !isNonEmptyString(find["equals"])) {

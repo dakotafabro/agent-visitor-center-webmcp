@@ -7,18 +7,29 @@ export interface ToolAnnotations {
   debugging?: boolean;
 }
 
+export interface ValueSpec {
+  match?: string;
+  type?: "string" | "number";
+}
+
+export interface PickSpec extends ValueSpec {
+  path: string;
+  html?: Record<string, FieldSpec>;
+}
+
 export interface EndpointSource {
   type: "endpoint";
   url: string;
-  pick?: Record<string, string>;
+  pick?: Record<string, string | PickSpec>;
   find?: { field: string; equals: string };
   text?: boolean;
 }
 
-export interface FieldSpec {
+export interface FieldSpec extends ValueSpec {
   selector?: string;
   attribute?: string;
   all?: boolean;
+  fields?: Record<string, FieldSpec>;
 }
 
 export interface SelectorSource {

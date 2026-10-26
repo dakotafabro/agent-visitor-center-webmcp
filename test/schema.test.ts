@@ -95,6 +95,33 @@ describe("validateSchema", () => {
     expect(result.errors).toEqual(["tools[0].source.fields.title needs a selector, an attribute, or both."]);
   });
 
+  it("checks match patterns, value types and pick objects", () => {
+    // given
+    const schema = {
+      version: 1,
+      site: { name: "x" },
+      tools: [
+        {
+          name: "t",
+          description: "d",
+          source: { type: "endpoint", url: "/x", pick: { a: { path: "a", match: "(" }, b: { type: "number" }, c: { path: "c", type: "date" } } },
+        },
+      ],
+    };
+
+    // when
+    const result = validateSchema(schema);
+
+    // then
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors).toEqual([
+      "tools[0].source.pick.a.match isn't a valid regular expression.",
+      'tools[0].source.pick.b must be a field path or an object with a "path".',
+      'tools[0].source.pick.c.type must be "string" or "number".',
+    ]);
+  });
+
   it("throws SchemaError from parseSchema", () => {
     expect(() => parseSchema({ version: 1 })).toThrow(SchemaError);
   });
