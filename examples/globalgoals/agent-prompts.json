@@ -1,0 +1,62 @@
+[
+  {
+    "id": "actions-13",
+    "start": "https://globalgoals.org/goals/13-climate-action/",
+    "prompt": "What can I do for Goal 13?",
+    "expect": [
+      {
+        "tool": "get_actions",
+        "input": {
+          "number": 13
+        }
+      }
+    ]
+  },
+  {
+    "id": "oceans-targets",
+    "start": "https://globalgoals.org/goals/",
+    "prompt": "Which Global Goal is about oceans, and what are its targets?",
+    "expect": [
+      {
+        "tool": "get_targets",
+        "input": {
+          "number": 14
+        }
+      }
+    ]
+  },
+  {
+    "id": "open-energy",
+    "start": "https://globalgoals.org/goals/",
+    "prompt": "Take me to the page for the goal about clean energy, and show me its targets on the page.",
+    "expect": [
+      {
+        "tool": "open_goal",
+        "input": {
+          "slug": "7-affordable-and-clean-energy"
+        },
+        "pageAfter": "https://globalgoals.org/goals/7-affordable-and-clean-energy/"
+      },
+      {
+        "tool": "scroll_to_section",
+        "input": {
+          "section": "targets"
+        },
+        "pageAfter": "https://globalgoals.org/goals/7-affordable-and-clean-energy/"
+      }
+    ]
+  },
+  {
+    "id": "count-and-five",
+    "start": "https://globalgoals.org/goals/",
+    "prompt": "How many Global Goals are there, and what is Goal 5 about?",
+    "expect": [
+      {
+        "anyOf": [
+          "list_goals",
+          "get_goal"
+        ]
+      }
+    ]
+  }
+]

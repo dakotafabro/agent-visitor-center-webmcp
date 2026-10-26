@@ -249,7 +249,7 @@
     {
       "name": "open_goal",
       "title": "Open a goal's page",
-      "description": "Open a Global Goal's page on globalgoals.org in this tab. Use the slug from list_goals or get_goal, for example 13-climate-action.",
+      "description": "Open a Global Goal's page on globalgoals.org in this tab. Use the slug from list_goals or get_goal, for example 13-climate-action. The page reloads, so this page's tools go away and the new page's tools load with it.",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -36,12 +36,14 @@
     "test": "vitest run",
     "check": "npm run typecheck && npm test && npm run build && npm run build:userscript",
     "build:userscript": "node scripts/build-userscript.mjs",
-    "live-check": "npm run build:userscript && node scripts/live-check.mjs"
+    "live-check": "npm run build:userscript && node scripts/live-check.mjs",
+    "agent-check": "npm run build:userscript && node scripts/agent-check.mjs"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "^6.0.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",

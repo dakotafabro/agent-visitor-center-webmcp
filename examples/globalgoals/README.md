@@ -25,3 +25,11 @@ This project isn't affiliated with or endorsed by Project Everyone, the Global G
 ## Check it against the live site
 
 `npm run live-check` loads the script into headless Chrome on the live site, once with native WebMCP and once with the polyfill, calls every tool, and repeats the read tools with the site's API blocked to check that the fallbacks return the same shape and values. It needs Google Chrome installed (set `CHROME_PATH` if it isn't in `/Applications`). It isn't part of CI, since it depends on a third-party site.
+
+## Check it with a real agent
+
+`npm run agent-check` gives the page's tools to [goose](https://github.com/aaif-goose/goose) and asks the questions in [`agent-prompts.json`](agent-prompts.json), such as "What can I do for Goal 13?". A small bridge (`scripts/webmcp-bridge.mjs`) opens the live page in headless Chrome with native WebMCP, lists the tools from `getTools()` as an MCP server, and runs each call through `executeTool()` in the page. goose runs with no other extensions, so the model can only answer from the page's tools.
+
+Each prompt passes when the model made the expected calls and they succeeded on the expected page. The calls, inputs, results and the model's answer are written to `agent-check-results/`. It needs goose with a configured model and Google Chrome.
+
+The userscript only registers in the top-level page (`@noframes` and a `window.top` check). Same-origin `about:blank` iframes on the site would otherwise register their own copies, and `open_goal` could navigate an iframe instead of the tab.

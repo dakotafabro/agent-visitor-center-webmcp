@@ -12,6 +12,7 @@ const banner = [
   "// @match        https://globalgoals.org/goals/*",
   "// @match        https://www.globalgoals.org/goals/*",
   "// @run-at       document-idle",
+  "// @noframes",
   "// @grant        none",
   "// ==/UserScript==",
 ].join("\n");
