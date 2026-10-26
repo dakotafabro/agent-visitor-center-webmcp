@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import puppeteer from "puppeteer-core";
@@ -40,10 +40,11 @@ async function withPage(browser, url, { blockCms = false } = {}, run) {
 
 for (const native of [true, false]) {
   const mode = native ? "native WebMCP" : "polyfill";
+  const profile = join(tmpdir(), `avc-live-${Date.now()}`);
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: "new",
-    userDataDir: join(tmpdir(), `avc-live-${Date.now()}`),
+    userDataDir: profile,
     args: native ? ["--enable-features=WebMCPTesting"] : [],
   });
   console.log(`\n${mode} (${await browser.version()})`);
@@ -84,6 +85,7 @@ for (const native of [true, false]) {
     });
   } finally {
     await browser.close();
+    await rm(profile, { recursive: true, force: true });
   }
 }
 
