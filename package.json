@@ -1,0 +1,49 @@
+{
+  "name": "agent-visitor-center-webmcp",
+  "version": "0.0.0",
+  "description": "A visitor center for agents: describe a site's tools in one schema and register them through WebMCP.",
+  "license": "Apache-2.0",
+  "author": "Dakota Fabro",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dakotafabro/agent-visitor-center-webmcp.git"
+  },
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "agents",
+    "model-context"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@mcp-b/webmcp-polyfill": "^6.0.3"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.6.5",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12"
+  }
+}
