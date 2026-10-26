@@ -8,7 +8,7 @@ Early planning. Nothing here is ready to use yet.
 
 ## What's planned
 
-- **Core library:** registers a site's tools through `navigator.modelContext`, with a polyfill when the browser doesn't have it yet.
+- **Core library:** registers a site's tools through `document.modelContext`, with a polyfill when the browser doesn't have it yet.
 - **Site schema:** one JSON or YAML file that maps each tool to page content or a data endpoint. It's the only file a site owner writes.
 - **Loader:** a userscript or extension build that applies a schema to a site that hasn't adopted the kit, for prototypes and demos.
 - **Demo:** [globalgoals.org/goals](https://globalgoals.org/goals/), with read-only and navigation tools for the 17 Global Goals.
