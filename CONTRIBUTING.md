@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in agent-visitor-center-mcp. Contributions of every size are welcome: issues, docs, schemas for new sites, tests and code.
+Thanks for your interest in agent-visitor-center-webmcp. Contributions of every size are welcome: issues, docs, schemas for new sites, tests and code.
 
 ## Getting started
 
