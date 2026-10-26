@@ -58,5 +58,18 @@
         ]
       }
     ]
+  },
+  {
+    "id": "work-overlap",
+    "start": "https://globalgoals.org/goals/",
+    "prompt": "I mentor new engineers and build free lessons for people learning to code. Which Global Goals and targets overlap with that work?",
+    "expect": [
+      {
+        "tool": "get_targets",
+        "input": {
+          "number": 4
+        }
+      }
+    ]
   }
 ]
