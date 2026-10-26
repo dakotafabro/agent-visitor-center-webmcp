@@ -40,7 +40,9 @@ export async function getModelContext(
 
 /**
  * Registers every tool in `schema` on the page. Each tool has its own AbortController;
- * `unregister()` or aborting `options.signal` removes all of them.
+ * `unregister()` or aborting `options.signal` removes all of them. A tool that can't
+ * answer resolves to `{ error }` with the reason, since browsers pass a rejected
+ * tool call to the agent only as a generic error.
  */
 export async function registerSite(schema: SiteSchema | unknown, options: RegisterOptions = {}): Promise<Registration> {
   const site = parseSchema(schema);
@@ -85,7 +87,10 @@ export async function registerSite(schema: SiteSchema | unknown, options: Regist
               navigate,
               signal,
             };
-            return runWithFallback(sources, input ?? {}, context);
+            return runWithFallback(sources, input ?? {}, context).catch((error: unknown) => {
+              if (signal.aborted) throw error;
+              return { error: error instanceof Error ? error.message : String(error) };
+            });
           },
         },
         { signal: controller.signal },

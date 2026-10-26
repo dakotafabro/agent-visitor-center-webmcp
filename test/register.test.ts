@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { registerSite, getModelContext, ToolInputError, type ModelContextLike, type ModelContextToolLike } from "../src/index.js";
+import { registerSite, getModelContext, type ModelContextLike, type ModelContextToolLike } from "../src/index.js";
 
 class FakeModelContext implements ModelContextLike {
   tools = new Map<string, ModelContextToolLike>();
@@ -128,6 +128,72 @@ describe("registerSite", () => {
     expect(all).toEqual([{ title: "No Poverty" }, { title: "Zero Hunger" }]);
   });
 
+  it("joins text from separate elements with spaces and skips styles and icons", async () => {
+    // given
+    document.body.innerHTML = `<div id="hero"><span>13</span><style>.x{}</style><svg><text>icon</text></svg><p>Take urgent action.</p><a>Find out more</a></div>`;
+    const context = new FakeModelContext();
+    const heroSchema = {
+      version: 1,
+      site: { name: "x" },
+      tools: [{ name: "hero", description: "Hero text.", source: { type: "selector", selector: "#hero" } }],
+    };
+    await registerSite(heroSchema, { modelContext: context });
+
+    // when
+    const result = await context.call("hero");
+
+    // then
+    expect(result).toBe("13 Take urgent action. Find out more");
+  });
+
+  it("reads an attribute from the matched element itself", async () => {
+    // given
+    document.body.innerHTML = `<a class="goal-link" href="/goals/1-no-poverty/">No Poverty</a>`;
+    const context = new FakeModelContext();
+    const pageSchema = {
+      version: 1,
+      site: { name: "x" },
+      tools: [
+        {
+          name: "links",
+          description: "Goal links.",
+          source: { type: "selector", selector: ".goal-link", all: true, fields: { link: { attribute: "href" } } },
+        },
+      ],
+    };
+    await registerSite(pageSchema, { modelContext: context });
+
+    // when
+    const result = await context.call("links");
+
+    // then
+    expect(result).toEqual([{ link: "/goals/1-no-poverty/" }]);
+  });
+
+  it("keeps HTML block breaks as spaces when turning a picked list into text", async () => {
+    // given
+    const context = new FakeModelContext();
+    const listSchema = {
+      version: 1,
+      site: { name: "x" },
+      allowedOrigins: ["https://cms.example.org"],
+      tools: [
+        {
+          name: "targets",
+          description: "Targets.",
+          source: { type: "endpoint", url: "https://cms.example.org/t", pick: { list: "items[].copy" }, text: true },
+        },
+      ],
+    };
+    await registerSite(listSchema, { modelContext: context, fetch: jsonFetch({ items: [{ copy: "<h3>ERADICATE</h3><p>By 2030</p>" }] }) });
+
+    // when
+    const result = await context.call("targets");
+
+    // then
+    expect(result).toEqual({ list: ["ERADICATE By 2030"] });
+  });
+
   it("doesn't fetch from an origin outside allowedOrigins", async () => {
     // given
     const context = new FakeModelContext();
@@ -139,17 +205,35 @@ describe("registerSite", () => {
     await registerSite(offsite, { modelContext: context, fetch });
 
     // when / then
-    await expect(context.call("steal")).rejects.toThrow("isn't the page's origin or in allowedOrigins");
+    expect(await context.call("steal")).toEqual({ error: "https://evil.example.net isn't the page's origin or in allowedOrigins." });
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("rejects unsafe selector input without trying the fallback", async () => {
+  it("reports unsafe selector input without trying the fallback", async () => {
     // given
     const context = new FakeModelContext();
-    await registerSite(schema, { modelContext: context, fetch: jsonFetch({}, 500) });
+    const fallback = vi.fn(() => "fallback ran");
+    const inputSchema = {
+      version: 1,
+      site: { name: "x" },
+      tools: [
+        {
+          name: "section",
+          description: "Read a section.",
+          inputSchema: { type: "object", properties: { id: { type: "string" } } },
+          source: { type: "selector", selector: "#{id}" },
+          fallback: { type: "handler", handler: "fallback" },
+        },
+      ],
+    };
+    await registerSite(inputSchema, { modelContext: context, handlers: { fallback } });
 
-    // when / then
-    await expect(context.call("get_goal", { number: "1, body" })).rejects.toBeInstanceOf(ToolInputError);
+    // when
+    const result = await context.call("section", { id: "x, body" });
+
+    // then
+    expect(result).toEqual({ error: 'Input "id" may only use letters, numbers, "-" and "_".' });
+    expect(fallback).not.toHaveBeenCalled();
   });
 
   it("navigates only within the site and encodes input", async () => {

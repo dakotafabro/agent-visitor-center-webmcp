@@ -21,19 +21,45 @@ export interface RunContext {
   signal: AbortSignal;
 }
 
+const SEGMENT = /^([^[\]]*)(?:\[([^\]]*)\])?$/;
+
+function step(current: unknown, key: string): unknown {
+  if (key === "") return current;
+  if (current === null || typeof current !== "object") return undefined;
+  return (current as Record<string, unknown>)[key];
+}
+
+function walk(current: unknown, parts: string[]): unknown {
+  const [part, ...rest] = parts;
+  if (part === undefined) return current;
+  const match = SEGMENT.exec(part);
+  if (!match) return undefined;
+  const [, key = "", filter] = match;
+  const value = step(current, key);
+  if (filter === undefined) return walk(value, rest);
+  if (!Array.isArray(value)) return undefined;
+  if (filter === "") return value.map((item) => walk(item, rest));
+  const separator = filter.indexOf("=");
+  if (separator < 0) return undefined;
+  const field = filter.slice(0, separator);
+  const expected = filter.slice(separator + 1);
+  const found = value.find((item) => String(step(item, field)) === expected);
+  return found === undefined ? undefined : walk(found, rest);
+}
+
+/**
+ * Reads a dot path. `list[]` maps the rest of the path over an array, and
+ * `list[field=value]` picks the first item whose field, as a string, equals value.
+ */
 export function pathValue(value: unknown, path: string): unknown {
-  let current: unknown = value;
-  for (const part of path.split(".")) {
-    if (current === null || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
+  return walk(value, path.split("."));
 }
 
 function toText(document: Document, value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => toText(document, item));
   if (typeof value !== "string") return value;
   const container = document.createElement("template");
-  container.innerHTML = value;
+  container.innerHTML = value.replace(/<(?:br|\/p|\/h[1-6]|\/li|\/div)\b[^>]*>/gi, "$& ");
   return (container.content.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
@@ -75,16 +101,31 @@ async function runEndpoint(source: EndpointSource, input: ToolInput, context: Ru
   return Array.isArray(body) ? body.map((item) => pick(context.document, item, source)) : pick(context.document, body, source);
 }
 
+function textOf(element: Element): string {
+  const parts: string[] = [];
+  const walker = element.ownerDocument.createTreeWalker(element, 4);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    if (parent && (parent.closest("style, script, template") || parent.closest("svg"))) continue;
+    const text = (node.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (text) parts.push(text);
+  }
+  return parts.join(" ");
+}
+
 function readField(element: Element, field: FieldSpec): unknown {
-  const read = (target: Element) =>
-    field.attribute ? target.getAttribute(field.attribute) : (target.textContent ?? "").replace(/\s+/g, " ").trim();
-  if (field.all) return [...element.querySelectorAll(field.selector)].map(read);
+  if (!field.selector) return readValue(element, field);
+  if (field.all) return [...element.querySelectorAll(field.selector)].map((target) => readValue(target, field));
   const target = element.querySelector(field.selector);
-  return target ? read(target) : null;
+  return target ? readValue(target, field) : null;
+}
+
+function readValue(target: Element, field: FieldSpec): unknown {
+  return field.attribute ? target.getAttribute(field.attribute) : textOf(target);
 }
 
 function readElement(element: Element, source: SelectorSource): unknown {
-  if (!source.fields) return (element.textContent ?? "").replace(/\s+/g, " ").trim();
+  if (!source.fields) return textOf(element);
   const result: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(source.fields)) result[key] = readField(element, field);
   return result;

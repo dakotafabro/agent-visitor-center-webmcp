@@ -34,7 +34,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build && npm run build:userscript",
+    "build:userscript": "node scripts/build-userscript.mjs",
+    "live-check": "npm run build:userscript && node scripts/live-check.mjs"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "^6.0.3"
@@ -42,7 +44,9 @@
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
     "jsdom": "^29.1.1",
+    "puppeteer-core": "^25.16.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.12"
   }

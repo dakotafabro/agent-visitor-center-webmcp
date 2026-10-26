@@ -50,8 +50,12 @@ function checkSource(source: unknown, where: string, inputs: Set<string> | undef
       errors.push(`${where}.fields must be an object.`);
     } else {
       for (const [key, field] of Object.entries(fields)) {
-        if (!isObject(field) || !isNonEmptyString(field["selector"])) {
-          errors.push(`${where}.fields.${key}.selector is required.`);
+        if (!isObject(field)) {
+          errors.push(`${where}.fields.${key} must be an object.`);
+        } else if (field["selector"] !== undefined && !isNonEmptyString(field["selector"])) {
+          errors.push(`${where}.fields.${key}.selector must be a non-empty string when given.`);
+        } else if (field["selector"] === undefined && field["attribute"] === undefined) {
+          errors.push(`${where}.fields.${key} needs a selector, an attribute, or both.`);
         }
       }
     }

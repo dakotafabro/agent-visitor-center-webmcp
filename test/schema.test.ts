@@ -78,6 +78,23 @@ describe("validateSchema", () => {
     expect(result.errors).toContain("tools[0].fallback uses {id}, which isn't in the tool's inputSchema properties.");
   });
 
+  it("rejects a field with neither a selector nor an attribute", () => {
+    // given
+    const schema = {
+      version: 1,
+      site: { name: "x" },
+      tools: [{ name: "t", description: "d", source: { type: "selector", selector: ".a", fields: { title: {} } } }],
+    };
+
+    // when
+    const result = validateSchema(schema);
+
+    // then
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors).toEqual(["tools[0].source.fields.title needs a selector, an attribute, or both."]);
+  });
+
   it("throws SchemaError from parseSchema", () => {
     expect(() => parseSchema({ version: 1 })).toThrow(SchemaError);
   });

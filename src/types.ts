@@ -16,7 +16,7 @@ export interface EndpointSource {
 }
 
 export interface FieldSpec {
-  selector: string;
+  selector?: string;
   attribute?: string;
   all?: boolean;
 }

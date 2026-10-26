@@ -9,10 +9,11 @@
     "exactOptionalPropertyTypes": false,
     "noImplicitOverride": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "types": ["node"],
     "declaration": true,
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "examples"]
 }

@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "site": { "name": "The Global Goals", "url": "https://globalgoals.org/goals/" },
+  "allowedOrigins": ["https://globalgoalscms.co.uk"],
+  "tools": [
+    {
+      "name": "list_goals",
+      "title": "List the 17 Global Goals",
+      "description": "List all 17 Global Goals with their number, title, one-line summary and page slug. Text comes from globalgoals.org.",
+      "annotations": { "readOnlyHint": true, "untrustedContentHint": true },
+      "source": {
+        "type": "endpoint",
+        "url": "https://globalgoalscms.co.uk/wp-json/wp/v2/goals?per_page=20&_fields=slug,title,content,acf.id",
+        "pick": { "number": "acf.id", "title": "title.rendered", "summary": "content.rendered", "slug": "slug" },
+        "text": true
+      },
+      "fallback": {
+        "type": "selector",
+        "selector": "#goal-grid a.GoalGrid-item[href^=\"/goals/\"]",
+        "all": true,
+        "fields": { "link": { "attribute": "href" } }
+      }
+    },
+    {
+      "name": "get_goal",
+      "title": "Get one Global Goal",
+      "description": "Get one Global Goal by number (1-17): its title, summary, the longer introduction from its page, and its page slug.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 17, "description": "The goal number, 1 to 17." } },
+        "required": ["number"]
+      },
+      "annotations": { "readOnlyHint": true, "untrustedContentHint": true },
+      "source": {
+        "type": "endpoint",
+        "url": "https://globalgoalscms.co.uk/wp-json/wp/v2/goals?per_page=20&_fields=slug,title,content,acf.id,acf.flexible_content",
+        "find": { "field": "acf.id", "equals": "{number}" },
+        "pick": {
+          "number": "acf.id",
+          "title": "title.rendered",
+          "summary": "content.rendered",
+          "introduction": "acf.flexible_content[acf_fc_layout=single_column].column[].copy",
+          "slug": "slug"
+        },
+        "text": true
+      },
+      "fallback": { "type": "selector", "selector": "#Goal--Hero-{number}" }
+    },
+    {
+      "name": "get_targets",
+      "title": "Get a goal's targets",
+      "description": "Get the targets for one Global Goal by number (1-17), as listed on its globalgoals.org page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 17, "description": "The goal number, 1 to 17." } },
+        "required": ["number"]
+      },
+      "annotations": { "readOnlyHint": true, "untrustedContentHint": true },
+      "source": {
+        "type": "endpoint",
+        "url": "https://globalgoalscms.co.uk/wp-json/wp/v2/goals?per_page=20&_fields=title,acf.id,acf.flexible_content",
+        "find": { "field": "acf.id", "equals": "{number}" },
+        "pick": { "goal": "title.rendered", "targets": "acf.flexible_content[things_to_do=false].list[].copy" },
+        "text": true
+      },
+      "fallback": {
+        "type": "selector",
+        "selector": "body:has(#Goal--Hero-{number}) #targets .copy-box-ttd",
+        "all": true,
+        "fields": { "title": { "selector": "h3" }, "text": { "selector": "p" } }
+      }
+    },
+    {
+      "name": "get_actions",
+      "title": "Get things you can do for a goal",
+      "description": "Get the 'things to do' for one Global Goal by number (1-17): everyday actions a person can take, from its globalgoals.org page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "number": { "type": "integer", "minimum": 1, "maximum": 17, "description": "The goal number, 1 to 17." } },
+        "required": ["number"]
+      },
+      "annotations": { "readOnlyHint": true, "untrustedContentHint": true },
+      "source": {
+        "type": "endpoint",
+        "url": "https://globalgoalscms.co.uk/wp-json/wp/v2/goals?per_page=20&_fields=title,acf.id,acf.flexible_content",
+        "find": { "field": "acf.id", "equals": "{number}" },
+        "pick": { "goal": "title.rendered", "actions": "acf.flexible_content[things_to_do=true].list[].copy" },
+        "text": true
+      },
+      "fallback": { "type": "selector", "selector": "body:has(#Goal--Hero-{number}) #things-to-do .copy-box-ttd", "all": true }
+    },
+    {
+      "name": "open_goal",
+      "title": "Open a goal's page",
+      "description": "Open a Global Goal's page on globalgoals.org in this tab. Use the slug from list_goals or get_goal, for example 13-climate-action.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "slug": { "type": "string", "pattern": "^[0-9]{1,2}-[a-z-]+$", "description": "The goal's slug." } },
+        "required": ["slug"]
+      },
+      "source": { "type": "navigate", "url": "/goals/{slug}/" }
+    },
+    {
+      "name": "scroll_to_section",
+      "title": "Scroll to a section",
+      "description": "On a goal's page, scroll to its targets or its things to do.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "section": { "type": "string", "enum": ["targets", "things-to-do"] } },
+        "required": ["section"]
+      },
+      "source": { "type": "scroll", "selector": "#{section}" }
+    }
+  ]
+}
